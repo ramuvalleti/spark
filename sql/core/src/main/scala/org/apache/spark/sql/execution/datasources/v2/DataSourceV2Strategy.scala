@@ -465,7 +465,12 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       SetCatalogAndNamespaceExec(catalogManager, Some(catalog.name()), namespace) :: Nil
 
     case ShowTableProperties(rt: ResolvedTable, propertyKey, output) =>
-      ShowTablePropertiesExec(output, rt.table, rt.name, propertyKey) :: Nil
+      ShowTablePropertiesExec(output, rt.table, rt.name, propertyKey,
+        ShowTablePropertiesFormat.Standard) :: Nil
+
+    case ShowTablePropertiesJson(rt: ResolvedTable, propertyKey, output) =>
+      ShowTablePropertiesExec(output, rt.table, rt.name, propertyKey,
+        ShowTablePropertiesFormat.Json) :: Nil
 
     case AnalyzeTable(_: ResolvedTable, _, _) | AnalyzeColumn(_: ResolvedTable, _, _) =>
       throw QueryCompilationErrors.analyzeTableNotSupportedForV2TablesError()
