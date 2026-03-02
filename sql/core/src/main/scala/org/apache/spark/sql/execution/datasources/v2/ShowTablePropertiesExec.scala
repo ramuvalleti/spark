@@ -17,18 +17,37 @@
 
 package org.apache.spark.sql.execution.datasources.v2
 
+import scala.collection.mutable
+
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Table}
+import org.apache.spark.unsafe.types.UTF8String
+
+/**
+ * Output format for ShowTablePropertiesExec.
+ */
+sealed trait ShowTablePropertiesFormat
+
+object ShowTablePropertiesFormat {
+  case object Standard extends ShowTablePropertiesFormat
+  case object Json extends ShowTablePropertiesFormat
+}
 
 /**
  * Physical plan node for showing table properties.
+ * Supports both standard and JSON output formats.
  */
 case class ShowTablePropertiesExec(
     output: Seq[Attribute],
     catalogTable: Table,
     tableName: String,
-    propertyKey: Option[String]) extends LeafV2CommandExec {
+    propertyKey: Option[String],
+    format: ShowTablePropertiesFormat = ShowTablePropertiesFormat.Standard)
+  extends LeafV2CommandExec {
 
   override protected def run(): Seq[InternalRow] = {
     import scala.jdk.CollectionConverters._
@@ -36,6 +55,14 @@ case class ShowTablePropertiesExec(
     // The reserved properties are accessible through DESCRIBE
     val properties = conf.redactOptions(catalogTable.properties.asScala.toMap)
       .filter { case (k, _) => !CatalogV2Util.TABLE_RESERVED_PROPERTIES.contains(k) }
+
+    format match {
+      case ShowTablePropertiesFormat.Standard => runStandard(properties)
+      case ShowTablePropertiesFormat.Json => runJson(properties)
+    }
+  }
+
+  private def runStandard(properties: Map[String, String]): Seq[InternalRow] = {
     propertyKey match {
       case Some(p) =>
         val propValue = properties
@@ -49,5 +76,42 @@ case class ShowTablePropertiesExec(
         properties.toSeq.sortBy(_._1).map(kv =>
           toCatalystRow(kv._1, kv._2))
     }
+  }
+
+  private def runJson(properties: Map[String, String]): Seq[InternalRow] = {
+    val jsonString = propertyKey match {
+      case Some(key) =>
+        generateJsonForSingleProperty(properties, key)
+      case None =>
+        generateJsonForAllProperties(properties)
+    }
+    Seq(InternalRow(UTF8String.fromString(jsonString)))
+  }
+
+  private def generateJsonForSingleProperty(
+      properties: Map[String, String],
+      key: String): String = {
+    val jsonMap = mutable.LinkedHashMap[String, JValue]()
+
+    properties.get(key) match {
+      case Some(value) =>
+        jsonMap += "key" -> JString(key)
+        jsonMap += "value" -> JString(value)
+      case None =>
+        jsonMap += "key" -> JString(key)
+        jsonMap += "value" -> JString(s"Table $tableName does not have property: $key")
+    }
+
+    compact(render(JObject(jsonMap.toList)))
+  }
+
+  private def generateJsonForAllProperties(properties: Map[String, String]): String = {
+    val propertiesJson = JObject(
+      properties.toSeq.sortBy(_._1).map { case (key, value) =>
+        key -> JString(value)
+      }.toList
+    )
+
+    compact(render(JObject("properties" -> propertiesJson)))
   }
 }
