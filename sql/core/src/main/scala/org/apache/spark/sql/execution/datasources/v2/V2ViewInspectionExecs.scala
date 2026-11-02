@@ -22,6 +22,7 @@ import scala.jdk.CollectionConverters._
 
 import org.apache.spark.sql.catalyst.{InternalRow, SQLConfHelper}
 import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.catalyst.plans.logical.ShowTableProperties
 import org.apache.spark.sql.catalyst.util.{escapeSingleQuotedString, quoteIfNeeded, ResolveDefaultColumns}
 import org.apache.spark.sql.catalyst.util.ResolveDefaultColumnsUtils.CURRENT_DEFAULT_COLUMN_METADATA_KEY
 import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Identifier, TableCatalog, TableSummary, View}
@@ -109,24 +110,35 @@ case class ShowV2ViewPropertiesExec(
     output: Seq[Attribute],
     quotedName: String,
     viewInfo: View,
-    propertyKey: Option[String]) extends LeafV2CommandExec with SQLConfHelper {
+    propertyKey: Option[String],
+    asJson: Boolean = false) extends LeafV2CommandExec with SQLConfHelper {
 
   override protected def run(): Seq[InternalRow] = {
     val rawProps = viewInfo.properties.asScala.toMap
     val redacted = conf.redactOptions(rawProps)
-    propertyKey match {
-      case Some(p) =>
-        val propValue = redacted.getOrElse(p,
-          s"View $quotedName does not have property: $p")
-        if (output.length == 1) {
-          Seq(toCatalystRow(propValue))
-        } else {
-          Seq(toCatalystRow(p, propValue))
-        }
-      case None =>
-        redacted
-          .filter { case (k, _) => !CatalogV2Util.TABLE_RESERVED_PROPERTIES.contains(k) }
-          .toSeq.sortBy(_._1).map(p => toCatalystRow(p._1, p._2))
+    if (asJson) {
+      val visible =
+        redacted.filter { case (k, _) => !CatalogV2Util.TABLE_RESERVED_PROPERTIES.contains(k) }
+      val entries = propertyKey match {
+        case Some(p) => visible.get(p).map(p -> _).toSeq
+        case None => visible.toSeq.sortBy(_._1)
+      }
+      Seq(toCatalystRow(ShowTableProperties.propertiesToJson(entries)))
+    } else {
+      propertyKey match {
+        case Some(p) =>
+          val propValue = redacted.getOrElse(p,
+            s"View $quotedName does not have property: $p")
+          if (output.length == 1) {
+            Seq(toCatalystRow(propValue))
+          } else {
+            Seq(toCatalystRow(p, propValue))
+          }
+        case None =>
+          redacted
+            .filter { case (k, _) => !CatalogV2Util.TABLE_RESERVED_PROPERTIES.contains(k) }
+            .toSeq.sortBy(_._1).map(p => toCatalystRow(p._1, p._2))
+      }
     }
   }
 }

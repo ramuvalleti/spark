@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.catalyst.plans.logical.ShowTableProperties
 import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Table}
 
 /**
@@ -28,24 +29,33 @@ case class ShowTablePropertiesExec(
     output: Seq[Attribute],
     catalogTable: Table,
     tableName: String,
-    propertyKey: Option[String]) extends LeafV2CommandExec {
+    propertyKey: Option[String],
+    asJson: Boolean = false) extends LeafV2CommandExec {
 
   override protected def run(): Seq[InternalRow] = {
     // The reserved properties are accessible through DESCRIBE
     val properties = CatalogV2Util.tablePropertiesForDisplay(
       catalogTable.properties(), catalogTable.displayProperties(), conf)
-    propertyKey match {
-      case Some(p) =>
-        val propValue = properties
-          .getOrElse(p, s"Table $tableName does not have property: $p")
-        if (output.length == 1) {
-          Seq(toCatalystRow(propValue))
-        } else {
-          Seq(toCatalystRow(p, propValue))
-        }
-      case None =>
-        properties.toSeq.sortBy(_._1).map(kv =>
-          toCatalystRow(kv._1, kv._2))
+    if (asJson) {
+      val entries = propertyKey match {
+        case Some(p) => properties.get(p).map(p -> _).toSeq
+        case None => properties.toSeq.sortBy(_._1)
+      }
+      Seq(toCatalystRow(ShowTableProperties.propertiesToJson(entries)))
+    } else {
+      propertyKey match {
+        case Some(p) =>
+          val propValue = properties
+            .getOrElse(p, s"Table $tableName does not have property: $p")
+          if (output.length == 1) {
+            Seq(toCatalystRow(propValue))
+          } else {
+            Seq(toCatalystRow(p, propValue))
+          }
+        case None =>
+          properties.toSeq.sortBy(_._1).map(kv =>
+            toCatalystRow(kv._1, kv._2))
+      }
     }
   }
 }
