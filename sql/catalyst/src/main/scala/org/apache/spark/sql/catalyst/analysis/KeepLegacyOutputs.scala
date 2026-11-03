@@ -40,8 +40,8 @@ object KeepLegacyOutputs extends Rule[LogicalPlan] {
           assert(d.output.length == 2)
           d.copy(output = Seq(d.output.head.withName("database_description_item"),
             d.output.last.withName("database_description_value")))
-        case s: ShowTableProperties if s.propertyKey.isDefined =>
-           s.copy(output = Seq(s.output.last))
+        case s: ShowTableProperties if !s.asJson && s.propertyKey.isDefined =>
+          s.copy(output = Seq(s.output.last))
       }
     }
   }

@@ -473,9 +473,9 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       ShowCreateV2ViewExec(output, quoted, rpv.info) :: Nil
 
     case ShowTableProperties(rpv @ ResolvedPersistentView(catalog, ident, _),
-        propertyKey, output) =>
+        propertyKey, asJson, output) =>
       val quoted = (catalog.name() +: ident.asMultipartIdentifier).map(quoteIfNeeded).mkString(".")
-      ShowV2ViewPropertiesExec(output, quoted, rpv.info, propertyKey) :: Nil
+      ShowV2ViewPropertiesExec(output, quoted, rpv.info, propertyKey, asJson) :: Nil
 
     case ShowColumns(rpv @ ResolvedPersistentView(_, ident, _), ns, output) =>
       // If `SHOW COLUMNS IN <view> FROM <ns>` was written with both the view's namespace and
@@ -764,8 +764,8 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       val namespace = if (ns.nonEmpty) Some(ns) else None
       SetCatalogAndNamespaceExec(catalogManager, Some(catalog.name()), namespace) :: Nil
 
-    case ShowTableProperties(rt: ResolvedTable, propertyKey, output) =>
-      ShowTablePropertiesExec(output, rt.table, rt.name, propertyKey) :: Nil
+    case ShowTableProperties(rt: ResolvedTable, propertyKey, asJson, output) =>
+      ShowTablePropertiesExec(output, rt.table, rt.name, propertyKey, asJson) :: Nil
 
     case AnalyzeTable(_: ResolvedTable, _, _) | AnalyzeColumn(_: ResolvedTable, _, _) =>
       throw QueryCompilationErrors.analyzeTableNotSupportedForV2TablesError()

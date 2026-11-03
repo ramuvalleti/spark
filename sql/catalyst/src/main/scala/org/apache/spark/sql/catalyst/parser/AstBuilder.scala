@@ -7883,9 +7883,12 @@ class AstBuilder extends DataTypeAstBuilder
    */
   override def visitShowTblProperties(
       ctx: ShowTblPropertiesContext): LogicalPlan = withOrigin(ctx) {
+    val asJson = ctx.JSON != null
     ShowTableProperties(
       createUnresolvedTableOrView(ctx.table, "SHOW TBLPROPERTIES"),
-      Option(ctx.key).map(visitPropertyKeyOrStringLit))
+      Option(ctx.key).map(visitPropertyKeyOrStringLit),
+      asJson,
+      if (asJson) ShowTableProperties.getJsonOutputAttrs else ShowTableProperties.getOutputAttrs)
   }
 
   /**

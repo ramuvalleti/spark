@@ -607,12 +607,12 @@ class ResolveSessionCatalog(val catalogManager: CatalogManager)
       }
 
     // If target is view, force use v1 command
-    case ShowTableProperties(ResolvedViewIdentifier(ident), propertyKey, output) =>
-      ShowTablePropertiesCommand(ident, propertyKey, output)
+    case ShowTableProperties(ResolvedViewIdentifier(ident), propertyKey, asJson, output) =>
+      ShowTablePropertiesCommand(ident, propertyKey, asJson, output)
 
-    case ShowTableProperties(ResolvedV1TableIdentifier(ident), propertyKey, output)
+    case ShowTableProperties(ResolvedV1TableIdentifier(ident), propertyKey, asJson, output)
         if conf.useV1Command =>
-      ShowTablePropertiesCommand(ident, propertyKey, output)
+      ShowTablePropertiesCommand(ident, propertyKey, asJson, output)
 
     case DescribeFunction(ResolvedNonPersistentFunc(_, v1Func: V1Function), extended) =>
       DescribeFunctionCommand(v1Func.info, extended)
