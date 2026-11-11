@@ -2,35 +2,12 @@
 layout: global
 title: SHOW TBLPROPERTIES
 displayTitle: SHOW TBLPROPERTIES
-license: |
-  Licensed to the Apache Software Foundation (ASF) under one or more
-  contributor license agreements.  See the NOTICE file distributed with
-  this work for additional information regarding copyright ownership.
-  The ASF licenses this file to You under the Apache License, Version 2.0
-  (the "License"); you may not use this file except in compliance with
-  the License.  You may obtain a copy of the License at
- 
-     http://www.apache.org/licenses/LICENSE-2.0
- 
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
 ---
 
 ### Description
 
 This statement returns the value of a table property given an optional value for
 a property key. If no key is specified then all the properties are returned. 
-
-For tables in [Data Source V2](sql-v2-data-sources.html) catalogs, the output may also include
-display-only properties supplied by the catalog. Spark itself does not remove these entries on
-`ALTER TABLE ... UNSET TBLPROPERTIES`; whether they remain depends on the catalog.
-`SHOW CREATE TABLE` does not include them. Stored properties take precedence over display-only
-entries with the same key. After unsetting a stored property other than `comment`, Spark displays
-the display-only value with that key if the catalog still supplies it. Display-only `comment`
-entries are ignored, even after unsetting the stored `comment`.
 
 ### Syntax
 
@@ -73,8 +50,6 @@ SHOW TBLPROPERTIES table_identifier
     **Schema:**
 
     Below is the full JSON schema.
-    In actual output, the JSON is not pretty-printed (see Examples).
-
     ```json
     {
       "properties": [{"key": "k", "value": "v"}, ...]
@@ -83,15 +58,8 @@ SHOW TBLPROPERTIES table_identifier
 
     | Field | Type | Description |
     |---|---|---|
-    | `properties` | array of objects | Each element maps a property `key` to its string `value`. Sorted by key when all properties are listed. When a specific property key is requested and it is not set on the table, the array is empty rather than containing a placeholder message. |
+    | `properties` | array of objects | Each element maps a property `key` to its string `value` and If specific property key is requested and it is not set on the table, the array is empty. Sorted by key when all properties are listed.  |
 
-**Note**
-- Property value returned by this statement excludes some properties 
-  that are internal to spark and hive. The excluded properties are :
-  - All the properties that start with prefix `spark.sql`
-  - Property keys such as:  `EXTERNAL`, `comment`
-  - All the properties generated internally by hive to store statistics. Some of these
-    properties are: `numFiles`, `numPartitions`, `numRows`.
 
 ### Examples
 
@@ -165,7 +133,4 @@ SHOW TBLPROPERTIES customer ('does.not.exist') AS JSON;
 
 ### Related Statements
 
-* [CREATE TABLE](sql-ref-syntax-ddl-create-table.html)
-* [ALTER TABLE SET TBLPROPERTIES](sql-ref-syntax-ddl-alter-table.html)
-* [SHOW TABLES](sql-ref-syntax-aux-show-tables.html)
-* [SHOW TABLE EXTENDED](sql-ref-syntax-aux-show-table.html)
+* [SHOW CREATE TABLE](sql-ref-syntax-aux-show-create-table.md)
