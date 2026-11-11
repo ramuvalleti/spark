@@ -37,6 +37,7 @@ entries are ignored, even after unsetting the stored `comment`.
 ```sql
 SHOW TBLPROPERTIES table_identifier 
    [ ( unquoted_property_key | property_key_as_string_literal ) ]
+   [ AS JSON ]
 ```
 
 ### Parameters
@@ -58,6 +59,31 @@ SHOW TBLPROPERTIES table_identifier
 * **property_key_as_string_literal**
 
     Specifies a property key value as a string literal.
+
+* **AS JSON**
+
+    An optional parameter to return the table properties as a single-row JSON document
+    instead of the default tabular format. Supported for both V1 (session catalog / Hive
+    metastore) and V2 tables and views.
+
+    **Syntax:** `[ AS JSON ]`
+
+    **Output schema:** A single column named `json_metadata` of type `STRING NOT NULL`.
+
+    **Schema:**
+
+    Below is the full JSON schema.
+    In actual output, the JSON is not pretty-printed (see Examples).
+
+    ```json
+    {
+      "properties": [{"key": "k", "value": "v"}, ...]
+    }
+    ```
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `properties` | array of objects | Each element maps a property `key` to its string `value`. Sorted by key when all properties are listed. When a specific property key is requested and it is not set on the table, the array is empty rather than containing a placeholder message. |
 
 **Note**
 - Property value returned by this statement excludes some properties 
@@ -111,6 +137,30 @@ SHOW TBLPROPERTIES customer ('created.date');
 +----------+
 |01-01-2001|
 +----------+
+
+-- show all the user specified properties for table `customer` as JSON
+SHOW TBLPROPERTIES customer AS JSON;
++-----------------------------------------------------------------------------------------------------+
+|json_metadata                                                                                         |
++-----------------------------------------------------------------------------------------------------+
+|{"properties":[{"key":"created.by.user","value":"John"},{"key":"created.date","value":"01-01-2001"}]}|
++-----------------------------------------------------------------------------------------------------+
+
+-- show value for a specific property key as JSON
+SHOW TBLPROPERTIES customer ('created.date') AS JSON;
++------------------------------------------------------------+
+|json_metadata                                                |
++------------------------------------------------------------+
+|{"properties":[{"key":"created.date","value":"01-01-2001"}]}|
++------------------------------------------------------------+
+
+-- when the requested key is not set, AS JSON returns an empty array
+SHOW TBLPROPERTIES customer ('does.not.exist') AS JSON;
++-----------------+
+|json_metadata    |
++-----------------+
+|{"properties":[]}|
++-----------------+
 ```
 
 ### Related Statements
