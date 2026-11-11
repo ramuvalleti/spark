@@ -34,28 +34,8 @@ import org.apache.spark.sql.types.{MetadataBuilder, StringType}
 /**
  * The command for `SHOW TBLPROPERTIES ... AS JSON`.
  *
- * Unlike [[ShowTablesJsonCommand]] and [[ShowPartitionsJsonCommand]], `SHOW TBLPROPERTIES`
- * has four distinct property sources depending on what `child` resolves to, mirroring the
- * non-JSON command's own dispatch (spread across [[ShowTablePropertiesCommand]],
- * `ShowTablePropertiesExec`, and `ShowV2ViewPropertiesExec`):
- *
- *   - a temp view                                -> no properties (matches the text command)
- *   - a session-catalog persistent view or table  -> delegates to [[ShowTablePropertiesCommand]]
- *   - a non-session-catalog (v2) persistent view   -> reads `ResolvedPersistentView.info`
- *   - a non-session-catalog (v2) table             -> `CatalogV2Util.tablePropertiesForDisplay`
- *                                                     (stored + display-only properties)
- *
- * The catalog-type check here uses [[CatalogV2Util#isSessionCatalog]] for consistency with
- * [[ShowTablesJsonCommand]], which is a slightly coarser check than the private
- * `supportsV1Command` used internally by `ResolveSessionCatalog` (that method also special
- * cases `CatalogExtension`s). This is a known, narrow parity gap versus the text command for
- * that edge case.
- *
  * The output is a single row with a `json_metadata` column containing a JSON object of the
- * form: `{"properties": [{"key": "k", "value": "v"}, ...]}`. When a specific property key is
- * requested and it is not present, the array is empty rather than embedding a human-readable
- * "does not have property" sentence as a fake value -- unlike the text command, this output is
- * meant to be machine-parsed.
+ * form: `{"properties": [{"key": "k", "value": "v"}, ...]}`. 
  *
  * The syntax of using this command in SQL is:
  * {{{
@@ -101,8 +81,7 @@ case class ShowTablePropertiesJsonCommand(
     Seq(Row(compact(render(buildJson(properties)))))
   }
 
-  /** Reuses [[ShowTablePropertiesCommand]] for the session-catalog table/view path so the
-   * redaction, view-property filtering, and temp-view handling stay in exactly one place. */
+  /** Reuses [[ShowTablePropertiesCommand]] for the session-catalog table/view path */
   private def sessionCatalogProperties(
       sparkSession: SparkSession, ident: TableIdentifier): Map[String, String] = {
     ShowTablePropertiesCommand(ident, None, ShowTableProperties.getOutputAttrs)
@@ -111,7 +90,7 @@ case class ShowTablePropertiesJsonCommand(
       .toMap
   }
 
-  /** Mirrors the reserved-key filtering `ShowV2ViewPropertiesExec` applies for v2 views. */
+  /** filter reserved-keys, same as `ShowV2ViewPropertiesExec` */
   private def redactedProperties(
       sparkSession: SparkSession,
       rawProperties: java.util.Map[String, String]): Map[String, String] = {
