@@ -20,10 +20,11 @@ package org.apache.spark.sql.execution.command
 import org.apache.spark.sql.catalyst.analysis.{AnalysisTest, UnresolvedTableOrView}
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser.parsePlan
 import org.apache.spark.sql.catalyst.plans.logical.ShowTableProperties
-import org.apache.spark.sql.execution.command.ShowTablePropertiesJsonCommand
-import org.apache.spark.sql.test.SharedSparkSession
+import org.apache.spark.sql.execution.SparkSqlParser
 
-class ShowTblPropertiesParserSuite extends AnalysisTest with SharedSparkSession {
+class ShowTblPropertiesParserSuite extends AnalysisTest {
+  private lazy val parser = new SparkSqlParser()
+
   test("show tblproperties") {
     comparePlans(
       parsePlan("SHOW TBLPROPERTIES a.b.c"),
@@ -39,16 +40,15 @@ class ShowTblPropertiesParserSuite extends AnalysisTest with SharedSparkSession 
 
   test("show tblproperties as json") {
     // `AS JSON` is handled by `SparkSqlAstBuilder` (sql/core), not the plain `CatalystSqlParser`
-    // used by `parsePlan` above, so route through the session's actual SQL parser here.
-    val parse = spark.sessionState.sqlParser.parsePlan _
+    // used by `parsePlan` above, so use `SparkSqlParser` directly (no SparkSession needed).
     comparePlans(
-      parse("SHOW TBLPROPERTIES a.b.c AS JSON"),
+      parser.parsePlan("SHOW TBLPROPERTIES a.b.c AS JSON"),
       ShowTablePropertiesJsonCommand(
         UnresolvedTableOrView(Seq("a", "b", "c"), "SHOW TBLPROPERTIES AS JSON", true),
         None))
 
     comparePlans(
-      parse("SHOW TBLPROPERTIES a.b.c('propKey1') AS JSON"),
+      parser.parsePlan("SHOW TBLPROPERTIES a.b.c('propKey1') AS JSON"),
       ShowTablePropertiesJsonCommand(
         UnresolvedTableOrView(Seq("a", "b", "c"), "SHOW TBLPROPERTIES AS JSON", true),
         Some("propKey1")))
