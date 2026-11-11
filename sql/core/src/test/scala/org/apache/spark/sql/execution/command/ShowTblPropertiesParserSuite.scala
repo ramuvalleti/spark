@@ -34,4 +34,25 @@ class ShowTblPropertiesParserSuite extends AnalysisTest {
       ShowTableProperties(
         UnresolvedTableOrView(Seq("a", "b", "c"), "SHOW TBLPROPERTIES", true), Some("propKey1")))
   }
+
+  test("show tblproperties as json") {
+    // AS JSON is handled directly by the base AstBuilder (unlike the SHOW TABLES / SHOW
+    // PARTITIONS variants, which are intercepted in sql/core's SparkSqlParser), so the plain
+    // CatalystSqlParser used above works here too -- no SharedSparkSession needed.
+    comparePlans(
+      parsePlan("SHOW TBLPROPERTIES a.b.c AS JSON"),
+      ShowTableProperties(
+        UnresolvedTableOrView(Seq("a", "b", "c"), "SHOW TBLPROPERTIES", true),
+        None,
+        asJson = true,
+        output = ShowTableProperties.getJsonOutputAttrs))
+
+    comparePlans(
+      parsePlan("SHOW TBLPROPERTIES a.b.c('propKey1') AS JSON"),
+      ShowTableProperties(
+        UnresolvedTableOrView(Seq("a", "b", "c"), "SHOW TBLPROPERTIES", true),
+        Some("propKey1"),
+        asJson = true,
+        output = ShowTableProperties.getJsonOutputAttrs))
+  }
 }

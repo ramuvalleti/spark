@@ -21,6 +21,9 @@ import org.apache.spark.sql.{AnalysisException, QueryTest, Row}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{StringType, StructType}
 
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
+
 /**
  * This base suite contains unified tests for the `SHOW TBLPROPERTIES` command that check V1 and V2
  * table catalogs. The tests that cannot run for all supported catalogs are located in more
@@ -35,6 +38,7 @@ import org.apache.spark.sql.types.{StringType, StructType}
  */
 trait ShowTblPropertiesSuiteBase extends QueryTest with DDLCommandTestUtils {
   override val command = "SHOW TBLPROPERTIES"
+  implicit val formats: Formats = DefaultFormats
 
   test("SHOW TBLPROPERTIES BASIC") {
     withNamespaceAndTable("ns1", "tbl") { tbl =>
@@ -110,6 +114,48 @@ trait ShowTblPropertiesSuiteBase extends QueryTest with DDLCommandTestUtils {
           }
         }
       }
+    }
+  }
+
+  test("SHOW TBLPROPERTIES AS JSON") {
+    withNamespaceAndTable("ns1", "tbl") { tbl =>
+      spark.sql(s"CREATE TABLE $tbl (id bigint, data string) $defaultUsing " +
+        "TBLPROPERTIES ('user'='andrew', 'status'='new', 'password' = 'password')")
+
+      val jsonStr = sql(s"SHOW TBLPROPERTIES $tbl AS JSON").collect()(0).getString(0)
+      assert(sql(s"SHOW TBLPROPERTIES $tbl AS JSON").schema.fieldNames.toSeq ===
+        Seq("json_metadata"))
+      val properties = (parse(jsonStr) \ "properties").asInstanceOf[JArray].arr
+        .map(e => ((e \ "key").extract[String], (e \ "value").extract[String])).toMap
+      assert(properties("user") == "andrew")
+      assert(properties("status") == "new")
+      assert(properties("password") == "*********(redacted)")
+    }
+  }
+
+  test("SHOW TBLPROPERTIES(KEY) AS JSON") {
+    withNamespaceAndTable("ns1", "tbl") { tbl =>
+      spark.sql(s"CREATE TABLE $tbl (id bigint, data string) $defaultUsing " +
+        "TBLPROPERTIES ('user'='andrew', 'status'='new')")
+
+      val jsonStr = sql(s"SHOW TBLPROPERTIES $tbl ('status') AS JSON").collect()(0).getString(0)
+      val properties = (parse(jsonStr) \ "properties").asInstanceOf[JArray].arr
+      assert(properties.size == 1)
+      assert((properties.head \ "key").extract[String] == "status")
+      assert((properties.head \ "value").extract[String] == "new")
+    }
+  }
+
+  test("SHOW TBLPROPERTIES(KEY) AS JSON KEY NOT FOUND") {
+    withNamespaceAndTable("ns1", "tbl") { tbl =>
+      val nonExistingKey = "nonExistingKey"
+      spark.sql(s"CREATE TABLE $tbl (id bigint, data string) $defaultUsing " +
+        "TBLPROPERTIES ('user'='andrew', 'status'='new')")
+
+      val jsonStr =
+        sql(s"SHOW TBLPROPERTIES $tbl ('$nonExistingKey') AS JSON").collect()(0).getString(0)
+      val properties = (parse(jsonStr) \ "properties").asInstanceOf[JArray].arr
+      assert(properties.isEmpty)
     }
   }
 }

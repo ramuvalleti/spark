@@ -1768,10 +1768,10 @@ class PlanResolutionSuite extends SharedSparkSession with AnalysisTest {
         case DescribeRelation(r: ResolvedTable, _, _) =>
           assert(r.catalog == catalog)
           assert(r.identifier.name() == tableIdent)
-        case ShowTableProperties(r: ResolvedTable, _, _) =>
+        case ShowTableProperties(r: ResolvedTable, _, _, _) =>
           assert(r.catalog == catalog)
           assert(r.identifier.name() == tableIdent)
-        case ShowTablePropertiesCommand(t: TableIdentifier, _, _) =>
+        case ShowTablePropertiesCommand(t: TableIdentifier, _, _, _) =>
           assert(t.identifier == tableIdent)
       }
     }

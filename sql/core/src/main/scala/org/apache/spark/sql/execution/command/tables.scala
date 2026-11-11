@@ -1007,27 +1007,38 @@ case class ShowTablesCommand(
 case class ShowTablePropertiesCommand(
     table: TableIdentifier,
     propertyKey: Option[String],
+    asJson: Boolean = false,
     override val output: Seq[Attribute]) extends LeafRunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     val catalog = sparkSession.sessionState.catalog
     if (catalog.isTempView(table)) {
-      Seq.empty[Row]
+      if (asJson) Seq(Row(ShowTableProperties.propertiesToJson(Nil))) else Seq.empty[Row]
     } else {
       val catalogTable = catalog.getTableMetadata(table)
       val properties = sparkSession.sessionState.conf.redactOptions(catalogTable.properties)
-      propertyKey match {
-        case Some(p) =>
-          val propValue = properties
-            .getOrElse(p, s"Table ${catalogTable.qualifiedName} does not have property: $p")
-          if (output.length == 1) {
-            Seq(Row(propValue))
-          } else {
-            Seq(Row(p, propValue))
-          }
-        case None =>
+      if (asJson) {
+        val visibleProperties =
           properties.filter { case (k, _) => !k.startsWith(CatalogTable.VIEW_PREFIX) }
-            .toSeq.sortBy(_._1).map(p => Row(p._1, p._2))
+        val entries = propertyKey match {
+          case Some(p) => visibleProperties.get(p).map(p -> _).toSeq
+          case None => visibleProperties.toSeq.sortBy(_._1)
+        }
+        Seq(Row(ShowTableProperties.propertiesToJson(entries)))
+      } else {
+        propertyKey match {
+          case Some(p) =>
+            val propValue = properties
+              .getOrElse(p, s"Table ${catalogTable.qualifiedName} does not have property: $p")
+            if (output.length == 1) {
+              Seq(Row(propValue))
+            } else {
+              Seq(Row(p, propValue))
+            }
+          case None =>
+            properties.filter { case (k, _) => !k.startsWith(CatalogTable.VIEW_PREFIX) }
+              .toSeq.sortBy(_._1).map(p => Row(p._1, p._2))
+        }
       }
     }
   }

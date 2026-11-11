@@ -1617,10 +1617,15 @@ case class RefreshTable(child: LogicalPlan) extends UnaryCommand {
 
 /**
  * The logical plan of the SHOW TBLPROPERTIES command.
+ *
+ * @param asJson If true, output a single `json_metadata` string column instead of the default
+ *               `(key, value)` tabular schema. See [[ShowTableProperties.getJsonOutputAttrs]]
+ *               and [[ShowTableProperties.propertiesToJson]].
  */
 case class ShowTableProperties(
     table: LogicalPlan,
     propertyKey: Option[String],
+    asJson: Boolean = false,
     override val output: Seq[Attribute] = ShowTableProperties.getOutputAttrs) extends UnaryCommand {
   override def child: LogicalPlan = table
   override protected def withNewChildInternal(newChild: LogicalPlan): LogicalPlan =
@@ -1631,6 +1636,18 @@ object ShowTableProperties {
   def getOutputAttrs: Seq[Attribute] = Seq(
     AttributeReference("key", StringType, nullable = false)(),
     AttributeReference("value", StringType, nullable = false)())
+
+  def getJsonOutputAttrs: Seq[Attribute] = Seq(
+    AttributeReference("json_metadata", StringType, nullable = false)())
+
+  /** Shared JSON payload builder reused by every SHOW TBLPROPERTIES execution path (V1 command,
+   * v2 table exec, v2 view exec) so the `{"properties":[{"key":...,"value":...}, ...]}` shape
+   * is defined in exactly one place. */
+  def propertiesToJson(entries: Seq[(String, String)]): String = {
+    import org.json4s.JsonDSL._
+    import org.json4s.jackson.JsonMethods.{compact, render}
+    compact(render("properties" -> entries.map { case (k, v) => ("key" -> k) ~ ("value" -> v) }))
+  }
 }
 
 /**
